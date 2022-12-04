@@ -5,14 +5,9 @@ fn main() {
         let assignments: Vec<&str> = line.split(",").collect();
         let elf1: Vec<i32> = assignments[0].split("-").map(|x| x.parse::<i32>().unwrap()).collect();
         let elf2: Vec<i32> = assignments[1].split("-").map(|x| x.parse::<i32>().unwrap()).collect();
-        // 4-5, 1-2
-        //   4          2          5          1          1           5          2         4
         if elf1[0] <= elf2[1] && elf1[1] >= elf2[0] || elf2[0] <= elf1[1] && elf2[1] >= elf1[0] {
-                                                                            //elf1[0] >= elf2[1] -> 4 >= 2
             sum+=1;
-            //println!("+");
         }
-        //println!("{:?} {:?} {}",elf1, elf2, sum);
     }
 
     println!("{:?}",sum);
