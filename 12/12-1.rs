@@ -6,18 +6,14 @@ fn main() {
 
     let input = include_str!("../input/12.txt");
     let hills: Vec<Vec<u32>> = input.split("\n").map(|line| line.chars().
-    map(|c| if c == 'S' {0} else if c == 'E' {26} else {c as u32 - 'a' as u32}).collect::<Vec<u32>>()).collect();
+        map(|c| if c == 'S' {0} else if c == 'E' {26} else {c as u32 - 'a' as u32}).collect::<Vec<u32>>()).collect();
     let row_len = hills[0].len() + 1; // including \n
     let start = [input.chars().position(|c| c == 'S').unwrap()].map(|i| (i % row_len, i / row_len))[0];
     let end = [input.chars().position(|c| c == 'E').unwrap()].map(|i| (i % row_len, i / row_len))[0];
     let mut distances = vec![vec![100_000; hills[0].len()]; hills.len()];
-    //println!("{:?}", hills);
-    //println!("{:?}", distances);
-    println!("s={:?} e={:?}", start, end);
 
     let w = hills[0].len();
     let h = hills.len();
-
     let get_neighbours = |x: Coord| -> Vec<Coord>{
         let mut vec_ans = vec![];
         if x.0 > 0   {vec_ans.push((x.0 - 1, x.1))};
@@ -44,8 +40,7 @@ fn main() {
             }
         }
         q.pop_front();
-        println!("hill={:?} h={} d={}", cur_hill, hill_height(cur_hill), cur_dist);
+        //println!("hill={:?} h={} d={}", cur_hill, hill_height(cur_hill), cur_dist);
     }
-    //println!("{:?}", distances);
-    println!("{}", distances[end.1][end.0]);
+    println!("{}", dist(&distances, end));
 }
