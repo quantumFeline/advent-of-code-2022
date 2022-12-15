@@ -73,10 +73,4 @@ fn main() {
     }
 
     println!("{}", fallen);
-//    for y in arr {
-//        for x in y {
-//            print!{"{}", if x {"#"} else {"."}};
-//        }
-//        println!("");
-//    }
 }
