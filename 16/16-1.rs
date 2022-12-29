@@ -1,49 +1,54 @@
 use std::collections::HashMap;
 
-fn main() {
-    const SECONDS: usize = 30;
-    const MAX_VALVES_N: usize = 1000;
+struct Graph<'a> {
+    nodes: Vec<&'a str>,
+    edges: HashMap<&'a str, Vec<&'a str>>,
+    flow: HashMap<&'a str, i32>,
+}
 
-    let s1 = "Valve ";
-    let s2 = " has flow rate=";
-    let s3 = "; tunnels lead to valves ";
-    let s3_var = "; tunnel leads to valve ";
+impl Graph<'_> {
+    fn new(data: Vec<(&'static str, i32, Vec<&'static str>)>) -> Self{
+        let mut nodes = vec![];
+        let mut edges = HashMap::new();
+        let mut flow = HashMap::new();
+        for datum in data {
+            nodes.push(datum.0);
+            flow.insert(datum.0, datum.1);
+            edges.insert(datum.0, datum.2);
+            edges.get_mut(datum.0).unwrap().push(datum.0); // corridor to itself
+        }
+        Graph{nodes, edges, flow}
+    }
+}
+
+fn read() -> Vec<(&'static str, i32, Vec<&'static str>)> {
     let input = include_str!("../input/16.txt").lines();
 
-    //let mut valve_indices: HashMap<&str, usize> = HashMap::new();
-    //let mut next_valve_i: usize = 0;
-    //let mut valve_flow = vec![0; MAX_VALVES_N];
-    let mut valve_flow = HashMap::new();
-    let mut tunnels = HashMap::new(); //: HashMap<usize, Vec<usize>>
+    let mut data = vec![];
 
     for line in input {
-        let (valve, valve_info) = [line[s1.len()..].split(s2)].map(|mut x| (x.next().unwrap(), x.next().unwrap()))[0];
-        let (info1, info2) =
-        if valve_info.split(s3).collect::<Vec<_>>().len() == 2 {
-            [valve_info.split(s3)].map(|mut x| (x.next().unwrap(), x.next().unwrap()))[0]
-        } else {
-            [valve_info.split(s3_var)].map(|mut x| (x.next().unwrap(), x.next().unwrap()))[0]
-        };
-        let flow_rate = info1.parse::<i32>().unwrap();
-        let valve_tunnels = info2.split(", ").collect::<Vec<_>>();
-        println!("{:?} {:?} {:?}", valve, flow_rate, valve_tunnels);
+        let valve = &line[6..8];
+        let flow = line.split_once('=').unwrap().1.split_once(';').unwrap().0.parse().unwrap();
+        let adjacent: Vec<&str> = line.split_once("to valve").unwrap().1[1..].trim_start().split(", ").collect();
 
-//        if !valve_indices.contains(valve) {
-//            valve_indices.insert(valve, next_valve_i);
-//            next_valve_i += 1;
-//        }
-//        let valve_i = valve_indices.get(valve).unwrap();
-        valve_flow.insert(valve, flow_rate);
-        tunnels.insert(valve, valve_tunnels);
+        data.push((valve, flow, adjacent));
     }
+    data
+}
+
+fn main() {
+    let data = read();
+    let g = Graph::new(data);
 
     const VALVE_UNREACHABLE: i32 = -1_000_000;
+    const SECONDS: usize = 30 + 1;
+    let empty_vec: Vec<&str> = vec![];
 
     // path search
     let mut dp: Vec<HashMap<&str, i32>> = vec![HashMap::new(); SECONDS];
     let mut dp_open_valves: Vec<HashMap<&str, Vec<&str>>> = vec![HashMap::new(); SECONDS];
     // value = max active flow rate at i-th second, if we're standing in front of j-th valve
-    for valve in valve_flow.keys() {
+    for valve in g.nodes.iter() {
         if *valve == "AA" {
             dp[0].insert(valve, 0);
         } else {
@@ -51,21 +56,33 @@ fn main() {
         }
     }
 
+    println!("{:?} \n {:?}", g.flow, g.edges);
+
     for i in 1..SECONDS {
-        for valve in valve_flow.keys() {
-            let mut best_flow = VALVE_UNREACHABLE;
-            for prev_valve in tunnels.get(valve).unwrap() {
+        for valve in g.nodes.iter() {
+            let mut best_flow = if dp[i].get(valve).is_some() {*dp[i].get(valve).unwrap()} else {VALVE_UNREACHABLE};
+            for prev_valve in g.edges.get(valve).unwrap() {
                 let get_there_flow = *dp[i-1].get(prev_valve).unwrap();
-                let get_there_and_open_valve_flow = if i != 1 {*dp[i-2].get(prev_valve).unwrap() + valve_flow.get(valve).unwrap()} else {VALVE_UNREACHABLE};
+                let get_there_and_open_valve_flow = if i != 1 {*dp[i-2].get(prev_valve).unwrap() + g.flow.get(valve).unwrap()} else {VALVE_UNREACHABLE};
                 if best_flow < get_there_flow { // just get there from neighbouring point by i-th second
                     best_flow = get_there_flow;
-                } if best_flow < get_there_and_open_valve_flow { // get there AND open the valve by that time
+                    let dp_prev = dp_open_valves[i].get(prev_valve).unwrap_or_else(|| &empty_vec).clone();
+                    dp_open_valves[i].insert(valve, dp_prev);
+                    println!("Walking from {} to {}", prev_valve, valve);
+                } if best_flow < get_there_and_open_valve_flow && !dp_open_valves[i].get(valve).unwrap_or_else(|| &empty_vec).contains(valve) {
+                    // get there AND open the valve by that time
                     best_flow = get_there_and_open_valve_flow;
+                    let dp_prev = dp_open_valves[i].get(prev_valve).unwrap_or_else(|| &empty_vec).clone();
+                    dp_open_valves[i].insert(valve, dp_prev);
                     dp_open_valves[i].get_mut(valve).map(|val| val.push(valve));
+                    println!("Opening from {} to {}", prev_valve, valve)
                 }
+                dp[i].insert(valve, best_flow);
+                println!("{} {:?}", i, dp[i]);
             }
         }
     }
-
-    println!("{:?} \n {:?}", valve_flow, tunnels);
+    for i in 0..SECONDS {
+        println!("{} {:?}", i, dp[i]);
+    }
 }
