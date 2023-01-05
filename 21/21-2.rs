@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::collections::HashMap;
 use std::str::Split;
 
@@ -22,7 +23,7 @@ fn get_equation(monkeys: &HashMap<String, String>) -> String{
             if entity.chars().all(char::is_alphabetic) && !entity.is_empty() && entity != HUMAN_NAME{
                 println!("EQ: {:?} ENT: {:?}", equation, entity);
                 println!("EQ: {:?} ENT: {:?} VAL: {:?}", equation, entity, monkeys[entity]);
-                equation = equation.replace(entity,&(" ( ".to_owned() + &monkeys[entity] + " ) "));
+                equation = equation.replace(entity, & if monkeys[entity].chars().all(char::is_numeric) { monkeys[entity].clone() } else { " ( ".to_owned() + &monkeys[entity] + " ) " });
                 changed = true;
             }
         }
@@ -32,11 +33,11 @@ fn get_equation(monkeys: &HashMap<String, String>) -> String{
     equation
 }
 
-fn clean_double_spaces(mut s: String) -> String {
+fn clean(mut s: String) -> String {
     while s != s.replace("  ", " ") {
         s = s.replace("  ", " ");
     }
-    s
+    s.trim().to_string()
 }
 
 fn split_eq(eq: String) -> (String, String) {
@@ -49,49 +50,69 @@ fn split_eq(eq: String) -> (String, String) {
     }
 }
 
-fn main() {
-    let monkeys: HashMap<String, String> = include_str!("../input/21.txt").lines().map(|line| get_pair(line.split(": "))).collect();
-    let equation = clean_double_spaces(get_equation(&monkeys));
-    println!("EQ: {:?}", equation);
-    let (left_side, mut right_side) = split_eq(equation); // human is always on the left due to how this function works
-    println!("LEFT: {:?} RIGHT: {:?}", left_side, right_side);
-
-    let mut left_side_split = left_side.split(" ");
-    let mut get_next_two = || -> (String, String) {
-        (left_side_split.next().unwrap_or("").to_string(), left_side_split.next().unwrap_or("").to_string())
-    };
-
-    let (mut token, mut op) = get_next_two();
-    // left to human in eq
-    while token.as_str() != HUMAN_NAME {
-        right_side = match op.as_str() {
-            "+" => {right_side.to_owned() + " - " + &token},
-            "-" => {token.to_owned() + " - (" + &right_side + ")"},
-            "*" => {right_side.to_owned() + " / " + &token},
-            "/" => {token.to_owned() + " / (" + &right_side + ")"},
-            "" => {right_side},
-            _ => unreachable!()
-        };
-        println!("TOKEN: {:?} OP: {:?} EQ: {:?}", token, op, right_side);
-        (token, op) = get_next_two();
+fn unwrap_brackets(eq: &String) -> String {
+    let mut eqv = eq.trim().chars().collect::<Vec<_>>();
+    while *eqv.first().unwrap() == '(' && *eqv.last().unwrap() == ')' {
+        //println!("cur_crop: {:?}", eqv.iter().collect::<String>());
+        let mut bracket_count = 0;
+        for c in eqv[..eqv.len()-1].iter() { // check if init bracket never closes
+            if *c == '(' {
+                bracket_count += 1;
+            } else if *c == ')' {
+                bracket_count -= 1;
+            } if bracket_count == 0 {
+                // our job is done
+                return eqv.into_iter().collect();
+            }
+        }
+        eqv = eqv[2..eqv.len()-2].to_vec();
+        //println!("new: {:?}", eqv.iter().collect::<String>());
     }
+    eqv.into_iter().collect()
+}
 
-    // right to human
-    loop {
-        right_side = match op.as_str() {
-            "+" => {right_side.to_owned() + " - " + &token},
-            "-" => {token.to_owned() + " + (" + &right_side + ")"},
-            "*" => {right_side.to_owned() + " / " + &token},
-            "/" => {token.to_owned() + " * (" + &right_side + ")"},
-            "" => {right_side},
-            _ => unreachable!()
-        };
-
-        println!("TOKEN: {:?} OP: {:?} EQ: {:?}", token, op, right_side);
-        let (token, op) = get_next_two();
-        if token == "" || op == "" {
-            break;
+fn split_by_operation(eq: &String) -> (String, char, String) {
+    let operations: HashSet<char> = HashSet::from(['+', '-', '*', '/']);
+    let eq_unwrapped = unwrap_brackets(eq);
+    println!("SPLITTING: {:?}", eq_unwrapped);
+    let mut bracket_count = 0;
+    for (i, c) in eq_unwrapped.chars().enumerate() {
+        if c == '(' {
+            bracket_count += 1;
+        } else if c == ')' {
+            bracket_count -= 1;
+        } else if operations.contains(&c) && bracket_count == 0 {
+            println!("LEFT: {:?} OP: {:?} RIGHT: {:?}", eq_unwrapped[..i].to_string(), c, eq_unwrapped[i+1..].to_string());
+            return (clean(eq_unwrapped[..i].to_string()), c, clean(eq_unwrapped[i+1..].to_string()));
         }
     }
-    println!("{:?}", right_side);
+    unreachable!();
+}
+
+fn main() {
+    let monkeys: HashMap<String, String> = include_str!("../input/21.txt").lines().map(|line| get_pair(line.split(": "))).collect();
+    let equation = clean(get_equation(&monkeys));
+    println!("EQ: {:?}", equation);
+    let (mut left_side, mut right_side) = split_eq(equation); // human is always on the left due to how this function works
+    println!("LEFT_SIDE: {:?} RIGHT_SIDE: {:?}", left_side, right_side);
+
+    // transfer left side to the right
+    let op_inverse: HashMap<char, char> = HashMap::from([('+', '-'), ('-', '+'), ('*', '/'), ('/', '*')]);
+    while left_side != HUMAN_NAME {
+        println!("LOOPING; LEFT_SIDE: {:?} RIGHT_SIDE: {:?}", left_side, right_side);
+        let (left, op, right) = split_by_operation(&left_side);
+        if left.contains(HUMAN_NAME) {
+            (left_side, right_side) = (left, " ( ".to_owned() + &right_side + " ) " + &op_inverse[&op].to_string() + " ( " + &right + " ) ");
+            println!("CHANGED(1); LEFT_SIDE: {:?} RIGHT_SIDE: {:?}", left_side, right_side);
+        }
+        else if right.contains(HUMAN_NAME) {
+            (left_side, right_side) = (right, " ( ".to_owned() + &left + " ) " + &op_inverse[&op].to_string() + " ( " + &right_side + " ) ");
+            println!("CHANGED(2); LEFT_SIDE: {:?} RIGHT_SIDE: {:?}", left_side, right_side);
+        }
+    }
+    println!("LEFT: {:?} RIGHT: {:?}", left_side, right_side);
+
+    // evaluate right side
+
+    println!("{:?}", clean(right_side));
 }
