@@ -21,8 +21,8 @@ fn get_equation(monkeys: &HashMap<String, String>) -> String{
         let mut changed = false;
         for entity in equation.clone().split(" ") {
             if entity.chars().all(char::is_alphabetic) && !entity.is_empty() && entity != HUMAN_NAME{
-                println!("EQ: {:?} ENT: {:?}", equation, entity);
-                println!("EQ: {:?} ENT: {:?} VAL: {:?}", equation, entity, monkeys[entity]);
+                //println!("EQ: {:?} ENT: {:?}", equation, entity);
+                //println!("EQ: {:?} ENT: {:?} VAL: {:?}", equation, entity, monkeys[entity]);
                 equation = equation.replace(entity, & if monkeys[entity].chars().all(char::is_numeric) { monkeys[entity].clone() } else { " ( ".to_owned() + &monkeys[entity] + " ) " });
                 changed = true;
             }
@@ -74,7 +74,7 @@ fn unwrap_brackets(eq: &String) -> String {
 fn split_by_operation(eq: &String) -> (String, char, String) {
     let operations: HashSet<char> = HashSet::from(['+', '-', '*', '/']);
     let eq_unwrapped = unwrap_brackets(eq);
-    println!("SPLITTING: {:?}", eq_unwrapped);
+    //println!("SPLITTING: {:?}", eq_unwrapped);
     let mut bracket_count = 0;
     for (i, c) in eq_unwrapped.chars().enumerate() {
         if c == '(' {
@@ -82,11 +82,28 @@ fn split_by_operation(eq: &String) -> (String, char, String) {
         } else if c == ')' {
             bracket_count -= 1;
         } else if operations.contains(&c) && bracket_count == 0 {
-            println!("LEFT: {:?} OP: {:?} RIGHT: {:?}", eq_unwrapped[..i].to_string(), c, eq_unwrapped[i+1..].to_string());
+            //println!("LEFT: {:?} OP: {:?} RIGHT: {:?}", eq_unwrapped[..i].to_string(), c, eq_unwrapped[i+1..].to_string());
             return (clean(eq_unwrapped[..i].to_string()), c, clean(eq_unwrapped[i+1..].to_string()));
         }
     }
     unreachable!();
+}
+
+fn solve(eq: &String) -> i64 {
+    let eq_unwrapped = unwrap_brackets(eq);
+    match eq_unwrapped.parse::<i64>() {
+        Ok(val) => return val,
+        Err(_e) => {
+            let (left, op, right) = split_by_operation(&eq_unwrapped);
+            match op {
+                '+' => return solve(&left) + solve(&right),
+                '-' => return solve(&left) - solve(&right),
+                '*' => return solve(&left) * solve(&right),
+                '/' => return solve(&left) / solve(&right),
+                _ => unreachable!()
+            };
+        }
+    }
 }
 
 fn main() {
@@ -99,20 +116,25 @@ fn main() {
     // transfer left side to the right
     let op_inverse: HashMap<char, char> = HashMap::from([('+', '-'), ('-', '+'), ('*', '/'), ('/', '*')]);
     while left_side != HUMAN_NAME {
-        println!("LOOPING; LEFT_SIDE: {:?} RIGHT_SIDE: {:?}", left_side, right_side);
+        //println!("LOOPING; LEFT_SIDE: {:?} RIGHT_SIDE: {:?}", left_side, right_side);
         let (left, op, right) = split_by_operation(&left_side);
-        if left.contains(HUMAN_NAME) {
+        if left.contains(HUMAN_NAME) { // e.g. x + a = b => x = b - a
             (left_side, right_side) = (left, " ( ".to_owned() + &right_side + " ) " + &op_inverse[&op].to_string() + " ( " + &right + " ) ");
-            println!("CHANGED(1); LEFT_SIDE: {:?} RIGHT_SIDE: {:?}", left_side, right_side);
+            println!("CHANGED(L); LEFT_SIDE: {:?} RIGHT_SIDE: {:?}", left_side, right_side);
         }
-        else if right.contains(HUMAN_NAME) {
-            (left_side, right_side) = (right, " ( ".to_owned() + &left + " ) " + &op_inverse[&op].to_string() + " ( " + &right_side + " ) ");
-            println!("CHANGED(2); LEFT_SIDE: {:?} RIGHT_SIDE: {:?}", left_side, right_side);
+        else if right.contains(HUMAN_NAME) { // a + x = b => x = b - a; a - x = b => x = a - b; a * x = b => x = b / a; a / x = b => x = a / b
+            if op == '+' || op == '*' {
+                (left_side, right_side) = (right, " ( ".to_owned() + &right_side + " ) " + &op_inverse[&op].to_string() + " ( " + &left + " ) ");
+            } else {
+                (left_side, right_side) = (right, " ( ".to_owned() + &left + " ) " + &op.to_string() + " ( " + &right_side + " ) ");
+            }
+            println!("CHANGED(R); LEFT_SIDE: {:?} RIGHT_SIDE: {:?}", left_side, right_side);
         }
     }
     println!("LEFT: {:?} RIGHT: {:?}", left_side, right_side);
 
     // evaluate right side
-
-    println!("{:?}", clean(right_side));
+    right_side = clean(right_side);
+    println!("{:?}", right_side);
+    println!("ANS: {:?}", solve(&right_side));
 }
