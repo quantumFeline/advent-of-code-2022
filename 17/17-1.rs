@@ -104,9 +104,6 @@ fn main() {
     let mut max_height: usize;
     let mut rock = FigurePosed {figure: &rocks[0], pos: Coord{x: 0, y: 0}};
 
-    //println!("{}", wind.join(""));
-    println!("{:?}", rocks);
-
     while cur_figure_i <= N_ROCKS {
         let wind_step = *wind.get(wind_i).unwrap();
 
@@ -142,6 +139,6 @@ fn main() {
 
         wind_i = (wind_i + 1) % wind.len();
     }
-    print_field(&field);
+
     println!("{:?}", max_h(&field)-1);
 }
